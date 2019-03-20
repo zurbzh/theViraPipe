@@ -129,9 +129,13 @@ public class EstimateReads {
                             String contig = fields[2];
                             String bases = fields[9];
                             String quality = fields[10];
-
-                            // filtered.add(flag+ "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
-                            filtered.add(contig);
+                            /*
+                            if (contig.equals("scaffold106_7e6fb306-3c7b-436e-8510-ed954068d8f6") || contig.equals("scaffold787_88768f3a-c21c-4a64-b286-5dac9d470b49")){
+                               filtered.add(read_name + "\t" + flag+ "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
+                                System.out.println(read_name + "\t" + flag+ "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
+                            }
+                            */
+                           filtered.add(contig);
 
                         }
 

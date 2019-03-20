@@ -47,22 +47,31 @@ public class EstimateReadsV2 {
 
         Dataset countedReads = registerCountedReads(input, sc, sqlContext);
         countedReads.registerTempTable("CountedReads");
-        countedReads.show();
 
         Dataset viruses = registerBlastViruses(blastViruses, sc, sqlContext);
         viruses.registerTempTable("Viruses");
 
-        viruses.show();
 
         String sql = "SELECT CountedReads.contig, CountedReads.count, Viruses.gi, Viruses.length, CountedReads.case, Viruses.family FROM CountedReads " +
                 "LEFT JOIN Viruses ON CountedReads.contig = Viruses.contig " +
                 "ORDER BY CountedReads.case";
 
         Dataset combined = sqlContext.sql(sql);
-        combined.show();
-        Dataset filtered = combined.filter(combined.col("family").notEqual("null"));
+        //Dataset filtered = combined.filter(combined.col("family").notEqual("null"));
+        Dataset filtered = combined.filter(combined.col("family").equalTo("Papillomaviridae"));
 
+        filtered.show();
+
+
+        Dataset ss = filtered.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"));
+
+
+        Dataset pivot = ss.na().fill(0);
+
+        pivot.coalesce(1).write().format("com.databricks.spark.csv").option("header", "true").save(outDir);
         /*
+
+
         JavaRDD<String> combinedRDD = dfToTabDelimited(combined);
         JavaRDD<String> filteredRDD = combinedRDD.filter(x -> !x.contains("null"));
         filteredRDD.saveAsTextFile(outDir);
@@ -71,9 +80,9 @@ public class EstimateReadsV2 {
                 org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"),
                 org.apache.spark.sql.functions.count("case").as("cases"));
 
-        groupped.show(100);
-        groupped.registerTempTable("final");
-        dfToTabDelimited(groupped).saveAsTextFile(outDir);
+       // groupped.show(100);
+        //groupped.registerTempTable("final");
+        //dfToTabDelimited(groupped).saveAsTextFile(outDir);
     }
 
     private static JavaRDD<String> dfToTabDelimited(Dataset<Row> df) {
