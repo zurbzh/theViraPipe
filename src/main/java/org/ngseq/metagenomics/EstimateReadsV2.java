@@ -26,9 +26,12 @@ public class EstimateReadsV2 {
         Option pathOpt = new Option("in", true, "Path to fastq file in hdfs.");    //gmOpt.setRequired(true);
         Option pathVir = new Option("pathVir", true, "Path to fastq file in hdfs.");    //gmOpt.setRequired(true);
         Option outOpt = new Option("out", true, "");
+        Option outGroupped = new Option("outG", true, "");
         options.addOption(pathOpt);
         options.addOption(outOpt);
         options.addOption(pathVir);
+        options.addOption(outGroupped);
+
 
 
         HelpFormatter formatter = new HelpFormatter();
@@ -44,6 +47,7 @@ public class EstimateReadsV2 {
         String input = cmd.getOptionValue("in");
         String blastViruses = cmd.getOptionValue("pathVir");
         String outDir = (cmd.hasOption("out") == true) ? cmd.getOptionValue("out") : null;
+        String outDirGrouped = (cmd.hasOption("outG") == true) ? cmd.getOptionValue("outG") : null;
 
         Dataset countedReads = registerCountedReads(input, sc, sqlContext);
         countedReads.registerTempTable("CountedReads");
@@ -60,8 +64,6 @@ public class EstimateReadsV2 {
         //Dataset filtered = combined.filter(combined.col("family").notEqual("null"));
         Dataset filtered = combined.filter(combined.col("family").equalTo("Papillomaviridae"));
 
-        filtered.show();
-
 
         Dataset ss = filtered.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"));
 
@@ -69,20 +71,19 @@ public class EstimateReadsV2 {
         Dataset pivot = ss.na().fill(0);
 
         pivot.coalesce(1).write().format("com.databricks.spark.csv").option("header", "true").save(outDir);
+
+
         /*
-
-
         JavaRDD<String> combinedRDD = dfToTabDelimited(combined);
         JavaRDD<String> filteredRDD = combinedRDD.filter(x -> !x.contains("null"));
         filteredRDD.saveAsTextFile(outDir);
-        */
-        Dataset groupped = filtered.groupBy("contig").agg(
-                org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"),
+         */
+        Dataset groupped = countedReads.groupBy("contig").agg(
+                org.apache.spark.sql.functions.sum(countedReads.col("count")).as("reads"),
                 org.apache.spark.sql.functions.count("case").as("cases"));
 
-       // groupped.show(100);
-        //groupped.registerTempTable("final");
-        //dfToTabDelimited(groupped).saveAsTextFile(outDir);
+          groupped.registerTempTable("final");
+          dfToTabDelimited(groupped).coalesce(1).saveAsTextFile(outDirGrouped);
     }
 
     private static JavaRDD<String> dfToTabDelimited(Dataset<Row> df) {
