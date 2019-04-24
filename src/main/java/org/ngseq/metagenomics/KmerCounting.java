@@ -31,8 +31,6 @@ public class KmerCounting {
     public static void main(String[] args) throws IOException {
         SparkConf conf = new SparkConf().setAppName("KmerCounting");
         JavaSparkContext sc = new JavaSparkContext(conf);
-        SQLContext sqlContext = new SQLContext(sc);
-
 
         Options options = new Options();
 

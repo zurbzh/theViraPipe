@@ -38,10 +38,14 @@ public class SortUnalignedTCGA {
 
         Option out = new Option("out", true, "output");
         Option folderIn = new Option("in", true, "");
+        Option format = new Option("format", true, "");
+
 
 
         options.addOption(out);
         options.addOption(folderIn);
+        options.addOption(format);
+
         CommandLineParser parser = new BasicParser();
         CommandLine cmd = null;
         try {
@@ -55,6 +59,8 @@ public class SortUnalignedTCGA {
         String output = (cmd.hasOption("out") == true) ? cmd.getOptionValue("out") : null;
 
         String in = (cmd.hasOption("in") == true) ? cmd.getOptionValue("in") : null;
+        String outFormat = (cmd.hasOption("format") == true) ? cmd.getOptionValue("format") : null;
+
 
         FileSystem fs = FileSystem.get(new Configuration());
         FileStatus[] dirs = fs.listStatus(new Path(in));
@@ -92,9 +98,15 @@ public class SortUnalignedTCGA {
             String name = items.get(items.size() - 1);
 
 
-            // save normalized case
-            //dfToFasta(sortedPairDF).coalesce(1).saveAsTextFile(output + "/" + name);
-            dfToFastqRDD(sortedPairDF).coalesce(1).saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+
+
+            if (outFormat.equals("fq")){
+                dfToFastqRDD(sortedPairDF).coalesce(1).saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+            } else {
+                // save normalized case
+                dfToFasta(sortedPairDF).coalesce(1).saveAsTextFile(output + "/" + name);
+
+            }
 
         }
 
@@ -110,7 +122,7 @@ public class SortUnalignedTCGA {
                   if (!fn.equalsIgnoreCase("_SUCCESS")) {
                       String folder = dir.getPath().toUri().getRawPath();
                       System.out.println("folder " + folder);
-                      String fileName = folder.substring(folder.lastIndexOf("/") + 1) + ".fq";
+                      String fileName = folder.substring(folder.lastIndexOf("/") + 1) + "." + outFormat;
 
 
                       Path srcPath = new Path(files[i].getPath().toUri().getRawPath());

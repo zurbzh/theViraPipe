@@ -32,8 +32,6 @@ public class EstimateReadsV2 {
         options.addOption(pathVir);
         options.addOption(outGroupped);
 
-
-
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp("spark-submit <spark specific args>", options, true);
 
@@ -51,6 +49,9 @@ public class EstimateReadsV2 {
 
         Dataset countedReads = registerCountedReads(input, sc, sqlContext);
         countedReads.registerTempTable("CountedReads");
+
+        Dataset countedReads2 = countedReads.filter(countedReads.col("count").$greater(4));
+
 
         Dataset viruses = registerBlastViruses(blastViruses, sc, sqlContext);
         viruses.registerTempTable("Viruses");
@@ -78,7 +79,7 @@ public class EstimateReadsV2 {
         JavaRDD<String> filteredRDD = combinedRDD.filter(x -> !x.contains("null"));
         filteredRDD.saveAsTextFile(outDir);
          */
-        Dataset groupped = countedReads.groupBy("contig").agg(
+        Dataset groupped = countedReads2.groupBy("contig").agg(
                 org.apache.spark.sql.functions.sum(countedReads.col("count")).as("reads"),
                 org.apache.spark.sql.functions.count("case").as("cases"));
 

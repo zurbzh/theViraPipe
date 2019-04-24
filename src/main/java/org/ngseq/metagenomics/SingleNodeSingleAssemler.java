@@ -125,26 +125,57 @@ public class SingleNodeSingleAssemler {
 
 
 
+        String config_file = "echo \"max_rd_len=50\n" +
+                "[LIB]\n" +
+                "#average insert size\n" +
+                "avg_ins=200\n" +
+                "#if sequence needs to be reversed\n" +
+                "reverse_seq=0\n" +
+                "#in which part(s) the reads are used\n" +
+                "asm_flags=3\n" +
+                "#use only first 100 bps of each read\n" +
+                "rd_len_cutoff=50\n" +
+                "#in which order the reads are used while scaffolding\n" +
+                "rank=1\n" +
+                "# cutoff of pair number for a reliable connection (at least 3 for short insert size)\n" +
+                "pair_num_cutoff=3\n" +
+                "#minimum aligned length to contigs for a reliable read location (at least 32 for short insert size)\n" +
+                "map_len=32\n" +
+                "#a pair of fastq file, read 1 file should always be followed by read 2 file\n" +
+                "p="+pathToLocalFasta+"/fasta.fa\n \" >"+pathToLocalFasta+"/soap.config.txt";
 
-        String idba = "idba --pre_correction -r "+pathToLocalFasta+"/fasta.fa -o "+pathToLocalFasta+"/idba";
-        executeBashCommand(idba);
+        executeBashCommand(config_file);
+
+        String mkdirs = "mkdir "+pathToLocalFasta+"/soaptrans";
+        executeBashCommand(mkdirs);
+
+        ArrayList<Integer> kmers = new ArrayList<Integer>(){{add(19);add(21);add(23);}};
 
 
 
-        File idbaOutput = new File(pathToLocalFasta+"/idba/scaffold.fa");
+        for (int kmer : kmers) {
 
-        if (idbaOutput.exists()) {
-
-            String getAllcontigs = "cat " + pathToLocalFasta + "/idba/scaffold.fa > " + pathToLocalFasta + "/final_contigs.fa";
-            executeBashCommand(getAllcontigs);
-
-        } else {
-            String getAllcontigs = "cat " + pathToLocalFasta + "/idba/contig.fa > " + pathToLocalFasta + "/final_contigs.fa";
-            executeBashCommand(getAllcontigs);
+            // run SOAPdenovo-Trans-31mer
+            String mkdirtrans = "mkdir " + pathToLocalFasta + "/soaptrans/" + kmer;
+            executeBashCommand(mkdirtrans);
+            String SoapdenovoTrans = "SOAPdenovo-Trans-31mer  all -s " + pathToLocalFasta + "/soap.config.txt -K " + kmer + "  -R -o " + pathToLocalFasta + "/soaptrans/" + kmer + "/" + kmer + " 1 >" + pathToLocalFasta + "/soaptrans/ass.log 2 > " + pathToLocalFasta + "/soaptrans/ass.err";
+            executeBashCommand(SoapdenovoTrans);
+            String movingFiletrans = "mv " + pathToLocalFasta + "/soaptrans/" + kmer + "/" + kmer + ".scafSeq " + pathToLocalFasta + "/soaptrans/";
+            executeBashCommand(movingFiletrans);
+            String dltrans = "rm -rf " + pathToLocalFasta + "/soaptrans/" + kmer;
+            executeBashCommand(dltrans);
         }
 
 
-        String final_local_path = pathToLocalFasta +"/final_contigs.fa";
+
+        String getAllcontigs = "cat " + pathToLocalFasta + "/soaptrans/*.scafSeq > " + pathToLocalFasta + "/final_contigs.fa";
+        executeBashCommand(getAllcontigs);
+
+        String cdhit = "cd-hit-est -i " + pathToLocalFasta +"/final_contigs.fa -o " +pathToLocalFasta +"/aggregated_assembly_cdhit -d 100 -T 0 -r 1 -g 1 -c 0.98 -G 0 -aS 0.95 -G 0 -M 0";
+        executeBashCommand(cdhit);
+
+
+        String final_local_path = pathToLocalFasta +"/aggregated_assembly_cdhit";
         fs.copyFromLocalFile(new Path(final_local_path), new Path(outDir));
 
 

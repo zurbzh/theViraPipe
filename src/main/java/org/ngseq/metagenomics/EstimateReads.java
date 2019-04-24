@@ -65,6 +65,12 @@ public class EstimateReads {
         String outDir = (cmd.hasOption("out") == true) ? cmd.getOptionValue("out") : null;
         String patients = cmd.getOptionValue("cases");
 
+        // samtools flags
+        ArrayList<Integer> flags = new ArrayList<Integer>(){{add(73);add(133);add(89);add(121);add(165);add(181);add(101);add(117);add(153);add(185);add(69);add(137);add(77);add(141);}};
+
+        Broadcast<ArrayList<Integer>> broadcastedFlags = sc.broadcast(flags);
+
+
         FileSystem fs = FileSystem.get(new Configuration());
 
         Path patinentFile = new Path(patients);
@@ -141,14 +147,14 @@ public class EstimateReads {
                             int flag = Integer.parseInt(fields[1]);
 
 
-                            if (flag != 77 && flag != 141) {
+                            if (!broadcastedFlags.value().contains(flag)) {
                                 String read_name = fields[0];
                                 String contig = fields[2];
                                 String bases = fields[9];
                                 String quality = fields[10];
 
                                 // filtered.add(read_name + "\t" å+ flag+ "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
-                                System.out.println(read_name + "\t" + flag + "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
+                                //System.out.println(read_name + "\t" + flag + "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
 
                                 filtered.add(contig);
 
