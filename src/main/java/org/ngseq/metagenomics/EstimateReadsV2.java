@@ -49,24 +49,22 @@ public class EstimateReadsV2 {
 
         Dataset countedReads = registerCountedReads(input, sc, sqlContext);
         countedReads.registerTempTable("CountedReads");
-
+        countedReads.show();
         Dataset countedReads2 = countedReads.filter(countedReads.col("count").$greater(4));
 
 
         Dataset viruses = registerBlastViruses(blastViruses, sc, sqlContext);
         viruses.registerTempTable("Viruses");
+        viruses.show();
 
-
-        String sql = "SELECT CountedReads.contig, CountedReads.count, Viruses.gi, Viruses.length, CountedReads.case, Viruses.family FROM CountedReads " +
+        String sql = "SELECT CountedReads.contig, CountedReads.count, Viruses.acc, Viruses.length, CountedReads.case, Viruses.taxa FROM CountedReads " +
                 "LEFT JOIN Viruses ON CountedReads.contig = Viruses.contig " +
                 "ORDER BY CountedReads.case";
 
         Dataset combined = sqlContext.sql(sql);
         //Dataset filtered = combined.filter(combined.col("family").notEqual("null"));
-        Dataset filtered = combined.filter(combined.col("family").equalTo("Papillomaviridae"));
 
-
-        Dataset ss = filtered.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"));
+        Dataset ss = combined.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"));
 
 
         Dataset pivot = ss.na().fill(0);
@@ -127,7 +125,7 @@ public class EstimateReadsV2 {
         JavaRDD<String> contigs = sc.textFile(input);
 
         // The schema is encoded in a string
-        String schemaString = "contig gi acc identity coverage length e-value organism family subfamily subfamilyType";
+        String schemaString = "contig acc identity coverage length e-value taxa";
 
         // Generate the schema based on the string of schema
         List<StructField> fields = new ArrayList<StructField>();
@@ -140,7 +138,7 @@ public class EstimateReadsV2 {
         JavaRDD<Row> rowRDD = contigs.map(
                 (Function<String, Row>) record -> {
                     String[] fields1 = record.split("\\|");
-                    return RowFactory.create(fields1[0], fields1[1], fields1[2], fields1[3], fields1[4], fields1[5], fields1[6], fields1[7], fields1[8], fields1[9], fields1[10]);
+                    return RowFactory.create(fields1[0], fields1[1], fields1[2], fields1[3], fields1[4], fields1[5], fields1[6]);
                 });
 
         // Apply the schema to the RDD.
