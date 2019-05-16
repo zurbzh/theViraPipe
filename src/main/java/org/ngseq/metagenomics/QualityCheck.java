@@ -110,51 +110,98 @@ public class QualityCheck {
 
       JavaPairRDD<Text, SequencedFragment> qualityReadsRDD = fqRDD.mapPartitionsToPair(part -> {
         List<Tuple2<Text, SequencedFragment>> QR = new ArrayList<>();
-
         Logger logger = new Logger(true, false,false);
         IlluminaClippingTrimmer ict1 = IlluminaClippingTrimmer.makeIlluminaClippingTrimmer(logger, adatptors,2,30,10);
-        FastqRecord trailedTrimmed;
-        FastqRecord windowTrimemed;
-        FastqRecord leadTrimmed;
-        FastqRecord [] fastqR = new FastqRecord[1];
+        FastqRecord trailedTrimmed1;
+        FastqRecord trailedTrimmed2;
+        FastqRecord windowTrimemed1;
+        FastqRecord windowTrimemed2;
+        FastqRecord leadTrimmed1;
+        FastqRecord leadTrimmed2;
+        FastqRecord [] fastqR = new FastqRecord[2];
         FastqRecord [] fastqRClipped;
 
 
+
+
+
+
         while (part.hasNext()) {
-          Tuple2<Text, SequencedFragment> fastq = part.next();
-          String name = fastq._1.toString();
-          String seq = fastq._2.getSequence().toString();
-          String quality = fastq._2.getQuality().toString();
+          Tuple2<Text, SequencedFragment> read1 = part.next();
+          String name = read1._1.toString().split("/")[0];
+          int key = Integer.parseInt(read1._1.toString().split("/")[1]);
+          String seq = read1._2.getSequence().toString();
 
-
+          String quality = read1._2.getQuality().toString();
           fastqR[0] =  new FastqRecord(name, seq, quality, phred);
-          fastqRClipped = ict1.processRecords(fastqR);
-
-          if (fastqRClipped[0] != null) {
-            leadTrimmed= new LeadingTrimmer(leading).processRecord(fastqRClipped[0]);
-          } else {
-            continue;
-          }
-          if (leadTrimmed != null) {
-            trailedTrimmed  = new TrailingTrimmer(trailing).processRecord(leadTrimmed);
-          } else {
-            continue;
-          }
-          if (trailedTrimmed != null){
-            windowTrimemed = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed);
-          } else {
-            continue;
-          }
 
 
-          if(windowTrimemed !=null && windowTrimemed.getSequence().length()>=minlen) {
-            Text t = new Text(windowTrimemed.getName());
-            SequencedFragment sf = new SequencedFragment();
-            sf.setSequence(new Text(windowTrimemed.getSequence()));
-            sf.setQuality(new Text(windowTrimemed.getQuality()));
 
-            QR.add(new Tuple2<>(t, sf));
+
+          if (part.hasNext()){
+            Tuple2<Text, SequencedFragment> read2 = part.next();
+            String name2 = read2._1.toString().split("/")[0];
+            int key2 = Integer.parseInt(read2._1.toString().split("/")[1]);
+            String seq2 = read2._2.getSequence().toString();
+            String quality2 = read2._2.getQuality().toString();
+
+            if (name.equals(name2) && key2 == 2 ){
+
+                fastqR[1] =  new FastqRecord(name2, seq2, quality2, phred);
+                fastqRClipped = ict1.processRecords(fastqR);
+                if (fastqRClipped[0] !=null && fastqRClipped[1] !=null) {
+                    leadTrimmed1= new LeadingTrimmer(leading).processRecord(fastqRClipped[0]);
+                    leadTrimmed2= new LeadingTrimmer(leading).processRecord(fastqRClipped[1]);
+
+                } else {
+                    continue;
+                }
+                if (leadTrimmed1 != null && leadTrimmed2 != null) {
+                    trailedTrimmed1  = new TrailingTrimmer(trailing).processRecord(leadTrimmed1);
+                    trailedTrimmed2  = new TrailingTrimmer(trailing).processRecord(leadTrimmed2);
+
+                } else {
+                    continue;
+                }
+                if (trailedTrimmed1 != null && trailedTrimmed2 != null){
+                    windowTrimemed1 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed1);
+                    windowTrimemed2 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed2);
+
+                } else {
+
+                    continue;
+                }
+
+
+                if(windowTrimemed1 !=null && windowTrimemed1.getSequence().length()>=minlen && windowTrimemed2 !=null && windowTrimemed2.getSequence().length()>=minlen) {
+
+                    Text t1 = new Text(windowTrimemed1.getName());
+                    SequencedFragment sf1 = new SequencedFragment();
+                    sf1.setSequence(new Text(windowTrimemed1.getSequence()));
+                    sf1.setQuality(new Text(windowTrimemed1.getQuality()));
+
+                    QR.add(new Tuple2<>(t1, sf1));
+
+                    Text t2 = new Text(windowTrimemed2.getName());
+                    SequencedFragment sf2 = new SequencedFragment();
+                    sf2.setSequence(new Text(windowTrimemed2.getSequence()));
+                    sf2.setQuality(new Text(windowTrimemed2.getQuality()));
+
+                    QR.add(new Tuple2<>(t2, sf2));
+
+                }
+
+            } else {
+                System.out.println("Single read: " + name);
+
+            }
+
           }
+
+
+
+
+
 
         }
 
@@ -169,7 +216,7 @@ public class QualityCheck {
 
       String name = items.get(items.size() - 1);
 
-      qualityReadsRDD.distinct().saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+      qualityReadsRDD.coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
     }
 
     sc.stop();

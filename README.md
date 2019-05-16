@@ -4,7 +4,8 @@ ViraPipe
 ViraPipe is a Apache Spark based scalable parallel pipeline for analysing metagenomes from NGS read data in a computing cluster or on a multi-core standalone machine.
 The pipeline is designed especially for viral metagenomes but the software is applicable for any other genome analysis purposes.
 The pipeline integrates parallel BWA-MEM read aligner, MegaHit DeNovo assembler, BLAST and HMMSearch tools. Pipeline includes
-also tools for sequence data normalization and filtration as well as SQL query interfaces for querying the data in parallel. Code for the trimming tool in this pipeline is adopted from the source code of Trimmomatic (http://www.usadellab.org/cms/?page=trimmomatic) and applied on Apache Spark.
+also tools for sequence data normalization and filtration as well as SQL query interfaces for querying the data in parallel.
+Code for the trimming tool in this pipeline is adopted from the source code of Trimmomatic (http://www.usadellab.org/cms/?page=trimmomatic) and applied on Apache Spark.
 FASTQ, FASTA, SAM/BAM and Apache Parquet formats are supported as well as BLAST tabular format. 
 
 ------------------------------------------------------------------------------------------

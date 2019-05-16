@@ -153,7 +153,7 @@ public class SQLQueryBAMTCGA {
 
               } else if (select.equals("filterHuman")) {
                   Dataset df2 = sqlContext.sql(filterHuman);
-
+                  df2.show();
 
                   JavaPairRDD<Text, SequencedFragment> FilteredHuman = dfToFastq(df2);
                   FilteredHuman.saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
