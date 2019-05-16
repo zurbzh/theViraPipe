@@ -23,14 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import trimmomatic.*;
 
-/**THIS IS IN MEMORY IMPLEMENTATION OF PARALLEL BWA AND READ FILTERING, NO READ SPLIT FILES ARE WRITTEN
- * Usage
- spark-submit --master local[${NUM_EXECUTORS}] --executor-memory 20g --class org.ngseq.metagenomics.NormalizeRDD metagenomics-0.9-jar-with-dependencies.jar -in ${OUTPUT_PATH}/${PROJECT_NAME}_aligned -out ${OUTPUT_PATH}/${PROJECT_NAME}_normalized -k ${NORMALIZATION_KMER_LEN} -C ${NORMALIZATION_CUTOFF}
-
- spark-submit --master yarn --deploy-mode ${DEPLOY_MODE} --conf spark.dynamicAllocation.enabled=true --conf spark.dynamicAllocation.cachedExecutorIdleTimeout=100 --conf spark.shuffle.service.enabled=true --conf spark.scheduler.mode=${SCHEDULER_MODE} --conf spark.task.maxFailures=100 --conf spark.yarn.max.executor.failures=100 --executor-memory 20g --conf spark.yarn.executor.memoryOverhead=10000  --class org.ngseq.metagenomics.NormalizeRDD metagenomics-0.9-jar-with-dependencies.jar -in ${OUTPUT_PATH}/${PROJECT_NAME}_aligned -out ${OUTPUT_PATH}/${PROJECT_NAME}_normalized -k ${NORMALIZATION_KMER_LEN} -C ${NORMALIZATION_CUTOFF}
-
- **/
-
 
 public class QualityCheck {
 
@@ -148,8 +140,11 @@ public class QualityCheck {
             if (name.equals(name2) && key2 == 2 ){
 
                 fastqR[1] =  new FastqRecord(name2, seq2, quality2, phred);
+                // trim Illumina adaptors
                 fastqRClipped = ict1.processRecords(fastqR);
+
                 if (fastqRClipped[0] !=null && fastqRClipped[1] !=null) {
+
                     leadTrimmed1= new LeadingTrimmer(leading).processRecord(fastqRClipped[0]);
                     leadTrimmed2= new LeadingTrimmer(leading).processRecord(fastqRClipped[1]);
 
@@ -168,7 +163,6 @@ public class QualityCheck {
                     windowTrimemed2 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed2);
 
                 } else {
-
                     continue;
                 }
 
