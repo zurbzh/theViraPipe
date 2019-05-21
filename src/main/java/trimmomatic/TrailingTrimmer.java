@@ -17,7 +17,7 @@ public class TrailingTrimmer extends AbstractSingleRecordTrimmer
 		for(int i=quals.length-1;i>0;i--)
 			{
 				if(quals[i]>=qual) {
-					return new FastqRecord(in, 0, i);
+					return new FastqRecord(in, 0, i+1);
 				}
 
 			}
