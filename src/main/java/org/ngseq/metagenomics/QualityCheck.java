@@ -106,8 +106,8 @@ public class QualityCheck {
         IlluminaClippingTrimmer ict1 = IlluminaClippingTrimmer.makeIlluminaClippingTrimmer(logger, adatptors,2,30,10);
         FastqRecord trailedTrimmed1;
         FastqRecord trailedTrimmed2;
-        FastqRecord windowTrimemed1;
-        FastqRecord windowTrimemed2;
+        FastqRecord windowTrimmed1;
+        FastqRecord windowTrimmed2;
         FastqRecord leadTrimmed1;
         FastqRecord leadTrimmed2;
         FastqRecord [] fastqR = new FastqRecord[2];
@@ -152,6 +152,7 @@ public class QualityCheck {
                     continue;
                 }
                 if (leadTrimmed1 != null && leadTrimmed2 != null) {
+
                     trailedTrimmed1  = new TrailingTrimmer(trailing).processRecord(leadTrimmed1);
                     trailedTrimmed2  = new TrailingTrimmer(trailing).processRecord(leadTrimmed2);
 
@@ -159,27 +160,29 @@ public class QualityCheck {
                     continue;
                 }
                 if (trailedTrimmed1 != null && trailedTrimmed2 != null){
-                    windowTrimemed1 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed1);
-                    windowTrimemed2 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed2);
+
+                    windowTrimmed1 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed1);
+                    windowTrimmed2 = new SlidingWindowTrimmer(slidingWindow,15).processRecord(trailedTrimmed2);
+
 
                 } else {
                     continue;
                 }
 
 
-                if(windowTrimemed1 !=null && windowTrimemed1.getSequence().length()>=minlen && windowTrimemed2 !=null && windowTrimemed2.getSequence().length()>=minlen) {
+                if(windowTrimmed1 !=null && windowTrimmed1.getSequence().length()>=minlen && windowTrimmed2 !=null && windowTrimmed2.getSequence().length()>=minlen) {
 
-                    Text t1 = new Text(windowTrimemed1.getName());
+                    Text t1 = new Text(windowTrimmed1.getName());
                     SequencedFragment sf1 = new SequencedFragment();
-                    sf1.setSequence(new Text(windowTrimemed1.getSequence()));
-                    sf1.setQuality(new Text(windowTrimemed1.getQuality()));
+                    sf1.setSequence(new Text(windowTrimmed1.getSequence()));
+                    sf1.setQuality(new Text(windowTrimmed1.getQuality()));
 
                     QR.add(new Tuple2<>(t1, sf1));
 
-                    Text t2 = new Text(windowTrimemed2.getName());
+                    Text t2 = new Text(windowTrimmed2.getName());
                     SequencedFragment sf2 = new SequencedFragment();
-                    sf2.setSequence(new Text(windowTrimemed2.getSequence()));
-                    sf2.setQuality(new Text(windowTrimemed2.getQuality()));
+                    sf2.setSequence(new Text(windowTrimmed2.getSequence()));
+                    sf2.setQuality(new Text(windowTrimmed2.getQuality()));
 
                     QR.add(new Tuple2<>(t2, sf2));
 

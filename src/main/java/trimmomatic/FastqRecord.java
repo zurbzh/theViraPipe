@@ -33,6 +33,8 @@ public class FastqRecord {
 
 
 		this.sequence = base.sequence.substring(headPos, headPos + length);
+
+
 		this.quality = base.quality.substring(headPos, headPos + length);
 		this.name = base.name;
 		this.phredOffset = base.phredOffset;
