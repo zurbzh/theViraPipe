@@ -4,6 +4,7 @@ import org.apache.commons.cli.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.spark.SparkConf;
@@ -41,24 +42,25 @@ public class QualityCheck {
     Option windowlenOpt = new Option("slidingWindow", true, "length of sliding window: default 4");
     Option minLengthOpt = new Option("minlen", true, "drop the read if it is shorter than this value : default 18");
     Option adaptorsOpt = new Option("adaptors", true, "file in hdfs containing adaptor sequences");
+    Option formatOpt = new Option("format", true, "output file format: default fastq");
+
 
 
 
     options.addOption( inOpt );
     options.addOption( outOpt );
-
     options.addOption( phredOpt );
     options.addOption( leadOpt );
     options.addOption( trailOpt );
     options.addOption( windowlenOpt );
-
     options.addOption( minLengthOpt );
-
     options.addOption( adaptorsOpt );
+    options.addOption( formatOpt );
 
 
 
-    CommandLineParser parser = new BasicParser();
+
+      CommandLineParser parser = new BasicParser();
     CommandLine cmd = null;
 
     try {
@@ -79,13 +81,15 @@ public class QualityCheck {
     int slidingWindow = (cmd.hasOption("slidingWindow")==true)? Integer.valueOf(cmd.getOptionValue("slidingWindow")):4;
     int minlen = (cmd.hasOption("minlen")==true)? Integer.valueOf(cmd.getOptionValue("minlen")):18;
     String adatptors = (cmd.hasOption("adaptors")==true)? cmd.getOptionValue("adaptors"):null;
+    String format = (cmd.hasOption("format")==true)? cmd.getOptionValue("format"):null;
 
 
 
 
 
 
-    // int minc = (cmd.hasOption("minc")==true)? Integer.parseInt(cmd.getOptionValue("minc")):0;
+
+      // int minc = (cmd.hasOption("minc")==true)? Integer.parseInt(cmd.getOptionValue("minc")):0;
 
 
     FileSystem fs = FileSystem.get(new Configuration());
@@ -206,15 +210,72 @@ public class QualityCheck {
       });
 
 
+        JavaRDD<String> qualityReadsfasta  = qualityReadsRDD.mapPartitions(part -> {
+            ArrayList<String> lines =new ArrayList<>();
+            while (part.hasNext()) {
+                Tuple2<Text, SequencedFragment> read1 = part.next();
+                String name = read1._1.toString();
+
+                String bases = read1._2.getSequence().toString();
+
+               if (part.hasNext()) {
+                   Tuple2<Text, SequencedFragment> read2 = part.next();
+                   String name2 = read2._1.toString();
+                   String bases2 = read2._2.getSequence().toString();
+
+                   if (name.equals(name2)) {
+                       lines.add(">" + name + "\n" + bases);
+                       lines.add(">" + name2 + "\n" + bases2);
+
+
+                   }
+               }
+            }
+
+            return lines.iterator();
+        });
+
 
 
       String dr = dir.getPath().toUri().getRawPath();
       List<String> items = Arrays.asList(dr.split("\\s*/\\s*"));
 
-      String name = items.get(items.size() - 1);
+      String[] name = items.get(items.size() - 1).split("\\.");
 
-      qualityReadsRDD.coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+      if (format.equals("fa")) {
+          qualityReadsfasta.coalesce(1).saveAsTextFile(outDir + "/" + name[0]);
+      } else {
+          qualityReadsRDD.coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name[0], Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+      }
+
+
+
+
+
     }
+
+      FileStatus[] dr = fs.listStatus(new Path(outDir));
+      for (FileStatus dir : dr) {
+
+          FileStatus[] files = fs.listStatus(dir.getPath());
+
+          for (int i = 0; i < files.length; i++) {
+              String fn = files[i].getPath().getName();
+
+              if (!fn.equalsIgnoreCase("_SUCCESS")) {
+                  String folder = dir.getPath().toUri().getRawPath();
+                  String fileName = folder.substring(folder.lastIndexOf("/") + 1) +"." +format;
+                  Path srcPath = new Path(files[i].getPath().toUri().getRawPath());
+
+                  String newPath = dir.getPath().getParent().toUri().getRawPath() + "/" + fileName;
+                  Path dstPath = new Path(newPath);
+
+                  FileUtil.copy(fs, srcPath, fs, dstPath, true, new Configuration());
+                  fs.delete(new Path(dir.getPath().toUri().getRawPath()));
+              }
+
+          }
+      }
 
     sc.stop();
 

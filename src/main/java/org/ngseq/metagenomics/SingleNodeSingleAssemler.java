@@ -98,9 +98,8 @@ public class SingleNodeSingleAssemler {
             String name = items.get(items.size() - 1).split("\\.")[0];
             if (lines.contains(name))
             {
-
                 Path srcPath = new Path(file.getPath().toUri().getRawPath());
-                Path dstPath = new Path( hdfsTempname+ "/" + name + ".fq");
+                Path dstPath = new Path( hdfsTempname+ "/" + name + ".fa");
                 FileUtil.copy(fs, srcPath, fs, dstPath, false, new Configuration());
 
             }
@@ -117,9 +116,9 @@ public class SingleNodeSingleAssemler {
 
         String pathToLocalFasta = localdir + "/" + tempName;
 
-        String cat = "cat " + pathToLocalFasta + "/*.fq > "+pathToLocalFasta+"/fasta.fa";
+        String cat = "cat " + pathToLocalFasta + "/*.fa > "+pathToLocalFasta+"/reads.fasta";
         executeBashCommand(cat);
-        String rm = "rm "+pathToLocalFasta+"/*.fq";
+        String rm = "rm "+pathToLocalFasta+"/*.fa";
         executeBashCommand(rm);
 
 
@@ -142,7 +141,7 @@ public class SingleNodeSingleAssemler {
                 "#minimum aligned length to contigs for a reliable read location (at least 32 for short insert size)\n" +
                 "map_len=32\n" +
                 "#a pair of fastq file, read 1 file should always be followed by read 2 file\n" +
-                "p="+pathToLocalFasta+"/fasta.fa\n \" >"+pathToLocalFasta+"/soap.config.txt";
+                "p="+pathToLocalFasta+"/reads.fasta\n \" >"+pathToLocalFasta+"/soap.config.txt";
 
         executeBashCommand(config_file);
 
