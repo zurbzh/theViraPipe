@@ -19,6 +19,7 @@ import org.apache.spark.sql.Row;
 import org.seqdoop.hadoop_bam.FastqInputFormat;
 import org.seqdoop.hadoop_bam.FastqOutputFormat;
 import org.seqdoop.hadoop_bam.SequencedFragment;
+import org.stringtemplate.v4.ST;
 import scala.Tuple2;
 
 import java.io.BufferedReader;
@@ -91,6 +92,7 @@ public class EstimateReads {
             List<String> items = Arrays.asList(file_path.split("\\s*/\\s*"));
             String name = items.get(items.size() - 1).split("\\.")[0];
             if (rows.contains(name)) {
+                System.out.println("input file " + file_path);
                 JavaPairRDD<Text, SequencedFragment> fastqRDD = sc.newAPIHadoopFile(file_path, FastqInputFormat.class, Text.class, SequencedFragment.class, sc.hadoopConfiguration());
 
                 JavaRDD<String> alignmentRDD = fastqRDD.mapPartitions(split -> {
@@ -111,7 +113,7 @@ public class EstimateReads {
 
                     while (split.hasNext()) {
                         Tuple2<Text, SequencedFragment> next = split.next();
-                        String key = next._1.toString();
+                        String key = next._1.toString().split("/")[0];
 
                         SequencedFragment sf = new SequencedFragment();
                         sf.setQuality(new Text(next._2.getQuality().toString()));
@@ -120,7 +122,7 @@ public class EstimateReads {
                         if (split.hasNext()) {
 
                             Tuple2<Text, SequencedFragment> next2 = split.next();
-                            String key2 = next2._1.toString();
+                            String key2 = next2._1.toString().split("/")[0];
 
                             SequencedFragment sf2 = new SequencedFragment();
                             sf2.setQuality(new Text(next2._2.getQuality().toString()));
@@ -129,8 +131,7 @@ public class EstimateReads {
                             if (key.equalsIgnoreCase(key2)) {
                                 L1.add(new ShortRead(key, sf.getSequence().toString().getBytes(), sf.getQuality().toString().getBytes()));
                                 L2.add(new ShortRead(key2, sf2.getSequence().toString().getBytes(), sf2.getQuality().toString().getBytes()));
-                            } else
-                                split.next();
+                            }
                         }
                     }
                     String[] aligns = mem.align(L1, L2);
@@ -141,6 +142,7 @@ public class EstimateReads {
 
                         Arrays.asList(aligns).forEach(aln -> {
                             String[] fields = aln.split("\\t");
+
                             int flag = Integer.parseInt(fields[1]);
 
 
@@ -150,10 +152,10 @@ public class EstimateReads {
                                 String bases = fields[9];
                                 String quality = fields[10];
 
-                                // filtered.add(read_name + "\t" å+ flag+ "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
+                                filtered.add(read_name + "\t" + bases + "\t" + quality);
                                 //System.out.println(read_name + "\t" + flag + "\t" + contig + "\t" + name + "\t" + bases + "\t" + quality);
 
-                                filtered.add(contig);
+                                //filtered.add(contig);
 
                             }
 
@@ -176,36 +178,69 @@ public class EstimateReads {
                     return line;
 
                 });
-                countRdd.coalesce(1).saveAsTextFile(outDir + "/" + name);
+
+
+                JavaPairRDD<Text, SequencedFragment> finalFastqRDD = alignmentRDD.mapPartitionsToPair(record -> {
+
+                    ArrayList<Tuple2<Text, SequencedFragment>> records = new ArrayList<Tuple2<Text, SequencedFragment>>();
+                    while (record.hasNext()) {
+                        String [] next = record.next().split("\t");
+                        String key = next[0];
+                        String sequence = next[1];
+                        String quality = next[2];
+
+                        Text t = new Text(key);
+                        SequencedFragment sf = new SequencedFragment();
+                        sf.setSequence(new Text(sequence));
+                        sf.setQuality(new Text(quality));
+                        records.add(new Tuple2<Text, SequencedFragment>(t, sf));
+                    }
+
+                        return records.iterator();
+
+                });
+
+
+               // System.out.println("output file " + outDir + "/" + name);
+
+                //countRdd.coalesce(1).saveAsTextFile(outDir + "/" + name);
+                if (finalFastqRDD.count() >4 ) {
+                    finalFastqRDD.saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+                }
+
+
             }
 
         }
+
+
+
+
+        sc.stop();
 
         FileStatus[] dr = fs.listStatus(new Path(outDir));
         for (FileStatus dir : dr) {
-
-            FileStatus[] files = fs.listStatus(dir.getPath());
-            for (int i = 0; i < files.length; i++) {
-                String fn = files[i].getPath().getName();
+            System.out.println("directory " + dir.toString());
+            FileStatus[] folders = fs.listStatus(dir.getPath());
+            for (int i = 0; i < folders.length; i++) {
+                String fn = folders[i].getPath().getName();
 
                 if (!fn.equalsIgnoreCase("_SUCCESS")) {
                     String folder = dir.getPath().toUri().getRawPath();
-                    String fileName = folder.substring(folder.lastIndexOf("/") + 1) + ".txt";
+                    String fileName = folder.substring(folder.lastIndexOf("/") + 1) + ".fq";
 
-                    Path srcPath = new Path(files[i].getPath().toUri().getRawPath());
+                    Path srcPath = new Path(folders[i].getPath().toUri().getRawPath());
                     String newPath = dir.getPath().getParent().toUri().getRawPath() + "/" + fileName;
-
                     Path dstPath = new Path(newPath);
 
-                    FileUtil.copy(fs, srcPath, fs, dstPath, false, new Configuration());
-                    //fs.delete(new Path(dir.getPath().toUri().getRawPath()));
+                    fs.rename(srcPath,dstPath);
+                    fs.delete(new Path(dir.getPath().toUri().getRawPath()));
+
+
                 }
 
             }
-
         }
-
-        sc.stop();
 
     }
 

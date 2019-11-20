@@ -27,6 +27,8 @@ import scala.Tuple2;
 import java.io.*;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  spark-submit  --master local[${NUM_EXECUTORS}] --executor-memory 10g  --class org.ngseq.metagenomics.BlastN metagenomics-0.9-jar-with-dependencies.jar -in ${OUTPUT_PATH}/${PROJECT_NAME}_blast_nonhuman -out ${OUTPUT_PATH}/${PROJECT_NAME}_blast_final -db ${BLAST_DATABASE} -outfmt 6 -num_threads ${BLAST_THREADS}
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 
  */
 public class BlastN {
+    private static final Logger LOG = Logger.getLogger(BlastN.class.getName());
 
     public static void main(String[] args) throws IOException {
 

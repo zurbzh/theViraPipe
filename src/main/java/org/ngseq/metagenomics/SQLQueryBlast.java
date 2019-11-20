@@ -163,7 +163,7 @@ public class SQLQueryBlast {
         Dataset viralSpecies = viruses.join(virDF, viruses.col("acc").equalTo(virDF.col("acc")));
         viralSpecies.registerTempTable("viruses");
 
-        dfToTabDelimited(viralSpecies).coalesce(1).saveAsTextFile(outDir);
+        dfToTabAll(finalResultDF).saveAsTextFile(outDir);
         /*
         if(outDir!=null){
             JavaRDD<String> resultRDD = dfToTabDelimited(viralSpecies).coalesce(1);
@@ -180,6 +180,19 @@ public class SQLQueryBlast {
             String output = row.getAs("qseqid")+"|"+row.getAs("acc")+"|"+row.getAs("pident")+"|"
                     +row.getAs("coverage")+"|"+ row.getAs("qlen")+"|"+row.getAs("evalue")+"|"
                     +row.getAs("taxa");
+
+            return output;
+        });
+    }
+
+
+    private static JavaRDD<String> dfToTabAll(Dataset<Row> df) {
+        return df.toJavaRDD().map(row ->  {
+            //qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore
+
+            String output = row.getAs("qseqid")+"|"+row.getAs("acc")+"|"+row.getAs("pident")+"|"
+                    +row.getAs("coverage")+"|"+ row.getAs("qlen")+"|"+row.getAs("evalue")+"|"
+                    +row.getAs("organism");
 
             return output;
         });

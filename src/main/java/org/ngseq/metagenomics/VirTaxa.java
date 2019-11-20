@@ -1,7 +1,6 @@
 package org.ngseq.metagenomics;
 
 import org.apache.spark.annotation.Private;
-import scala.tools.nsc.doc.model.Public;
 
 import java.io.Serializable;
 

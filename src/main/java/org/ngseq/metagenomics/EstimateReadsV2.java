@@ -43,33 +43,26 @@ public class EstimateReadsV2 {
             System.err.println("Parsing failed.  Reason: " + exp.getMessage());
         }
         String input = cmd.getOptionValue("in");
-        String blastViruses = cmd.getOptionValue("pathVir");
         String outDir = (cmd.hasOption("out") == true) ? cmd.getOptionValue("out") : null;
         String outDirGrouped = (cmd.hasOption("outG") == true) ? cmd.getOptionValue("outG") : null;
 
         Dataset countedReads = registerCountedReads(input, sc, sqlContext);
         countedReads.registerTempTable("CountedReads");
-        countedReads.show();
+
+
         Dataset countedReads2 = countedReads.filter(countedReads.col("count").$greater(4));
 
 
-        Dataset viruses = registerBlastViruses(blastViruses, sc, sqlContext);
-        viruses.registerTempTable("Viruses");
-        viruses.show();
 
-        String sql = "SELECT CountedReads.contig, CountedReads.count, Viruses.acc, Viruses.length, CountedReads.case, Viruses.taxa FROM CountedReads " +
-                "LEFT JOIN Viruses ON CountedReads.contig = Viruses.contig " +
-                "ORDER BY CountedReads.case";
-
-        Dataset combined = sqlContext.sql(sql);
         //Dataset filtered = combined.filter(combined.col("family").notEqual("null"));
 
-        Dataset ss = combined.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(combined.col("count")).as("reads"));
+        Dataset pivotNAs = countedReads2.groupBy("contig").pivot("case").agg(org.apache.spark.sql.functions.sum(countedReads2.col("count")).as("reads"));
 
 
-        Dataset pivot = ss.na().fill(0);
+        Dataset pivot = pivotNAs.na().fill(0);
+        Dataset sorted = pivot.sort(pivot.col("contig"));
 
-        pivot.coalesce(1).write().format("com.databricks.spark.csv").option("header", "true").save(outDir);
+        sorted.coalesce(1).write().format("com.databricks.spark.csv").option("header", "true").save(outDir);
 
 
         /*
