@@ -132,7 +132,6 @@ public class QualityCheckFastq {
 
 
 
-
                     if (part.hasNext()){
                         Tuple2<Text, SequencedFragment> read2 = part.next();
                         String name2 = read2._1.toString().split("/")[0];

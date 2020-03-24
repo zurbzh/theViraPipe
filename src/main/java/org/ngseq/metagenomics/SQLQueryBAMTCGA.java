@@ -23,8 +23,6 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructType;
 import org.seqdoop.hadoop_bam.*;
 import scala.Tuple2;
-import scala.Tuple3;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -91,42 +89,48 @@ public class SQLQueryBAMTCGA {
               if (f.getPath().getName().endsWith(".bam")) {
                   bm = f.getPath().toUri().getRawPath();
 
+                      System.out.println("bam file" + bm);
+
                       JavaPairRDD<LongWritable, SAMRecordWritable> bamPairRDD = sc.newAPIHadoopFile(bm, AnySAMInputFormat.class, LongWritable.class, SAMRecordWritable.class, sc.hadoopConfiguration());
                       //Map to SAMRecord RDD
-                      JavaRDD<SAMRecord> samRDD = bamPairRDD.map(v1 -> v1._2().get());
-                      JavaRDD<MyAlignment> rdd = samRDD.map(bam -> new MyAlignment(bam.getReadName(), bam.getStart(), bam.getReferenceName(), bam.getReadLength(), new String(bam.getReadBases(), StandardCharsets.UTF_8), bam.getCigarString(), bam.getReadUnmappedFlag(), bam.getDuplicateReadFlag(), bam.getBaseQualityString(), bam.getReadPairedFlag(), bam.getFirstOfPairFlag(), bam.getSecondOfPairFlag()));
+                     try {
+                         JavaRDD<SAMRecord> samRDD = bamPairRDD.map(v1 -> v1._2().get());
 
 
-                      Dataset<Row> samDF = sqlContext.createDataFrame(rdd, MyAlignment.class);
-                      samDF.registerTempTable("records");
-
-                      String unMapped = "SELECT * from records WHERE readUnmapped = TRUE";
-                      String mappedToVirus = "SELECT * from records WHERE readUnmapped = FALSE AND referenceName NOT LIKE 'chr%'";
-                      String filterHuman = "SELECT * from records WHERE readUnmapped = TRUE OR referenceName NOT LIKE 'chr%'";
+                         JavaRDD<MyAlignment> rdd = samRDD.map(bam -> new MyAlignment(bam.getReadName(), bam.getStart(), bam.getReferenceName(), bam.getReadLength(), new String(bam.getReadBases(), StandardCharsets.UTF_8), bam.getCigarString(), bam.getReadUnmappedFlag(), bam.getDuplicateReadFlag(), bam.getBaseQualityString(), bam.getReadPairedFlag(), bam.getFirstOfPairFlag(), bam.getSecondOfPairFlag()));
+                         //JavaRDD<MyAlignment> rdd = samRDD.map(bam -> new MyAlignment(bam.getReadName(), bam.getStart(), bam.getReferenceName(), bam.getReadLength(), new String(bam.getReadBases(), StandardCharsets.UTF_8), bam.getCigarString(), bam.getReadUnmappedFlag()));
 
 
-                      //case name for writing files
-                      String dr = dir.getPath().toUri().getRawPath();
-                      List<String> items = Arrays.asList(dr.split("\\s*/\\s*"));
+                         Dataset<Row> samDF = sqlContext.createDataFrame(rdd, MyAlignment.class);
+                         samDF.registerTempTable("records");
 
-                      String name = items.get(items.size() - 1);
-
-
-                      if (metaOut != null) {
-                          Dataset df = sqlContext.sql(mappedToVirus);
-                          Dataset meta = df.groupBy("referenceName").count();
-                          JavaRDD<String> metaRDD = dfToMeta(meta);
+                         String unMapped = "SELECT * from records WHERE readUnmapped = TRUE";
+                         String mappedToVirus = "SELECT * from records WHERE readUnmapped = FALSE AND referenceName NOT LIKE 'chr%'";
+                         String filterHuman = "SELECT * from records WHERE readUnmapped = TRUE OR referenceName NOT LIKE 'chr%'";
 
 
-                          metaRDD.coalesce(1).saveAsTextFile(metaOut + "/" + name);
-                      }
+                         //case name for writing files
+                         String dr = dir.getPath().toUri().getRawPath();
+                         List<String> items = Arrays.asList(dr.split("\\s*/\\s*"));
+
+                         String name = items.get(items.size() - 1);
 
 
-                      if (select.equals("aligned")) {
-                          Dataset df1 = sqlContext.sql(mappedToVirus);
-                          JavaRDD<String> aligned = dfToRDD(df1);
+                         if (metaOut != null) {
+                             Dataset df = sqlContext.sql(mappedToVirus);
+                             Dataset meta = df.groupBy("referenceName").count();
+                             JavaRDD<String> metaRDD = dfToMeta(meta);
 
-                          aligned.saveAsTextFile(output + "/" + name);
+
+                             metaRDD.coalesce(1).saveAsTextFile(metaOut + "/" + name);
+                         }
+
+
+                         if (select.equals("aligned")) {
+                             Dataset df1 = sqlContext.sql(mappedToVirus);
+                             JavaRDD<String> aligned = dfToRDD(df1);
+
+                             aligned.saveAsTextFile(output + "/" + name);
 
                         /*
                           Dataset pairEndKeys = df2.groupBy("readName").agg(count("*").as("count")).where("count > 1");
@@ -147,19 +151,22 @@ public class SQLQueryBAMTCGA {
                           reverseRDD.coalesce(1).saveAsNewAPIHadoopFile(output + "/" + name + "/" + "reverse", Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
                           */
 
-                      } else if (select.equals("filterHuman")) {
-                          Dataset df2 = sqlContext.sql(filterHuman);
-                          JavaPairRDD<Text, SequencedFragment> FilteredHuman = dfToFastq(df2).repartition(100);
-                          FilteredHuman.saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+                         } else if (select.equals("filterHuman")) {
+                             Dataset df2 = sqlContext.sql(filterHuman);
+                             JavaPairRDD<Text, SequencedFragment> FilteredHuman = dfToFastq(df2).repartition(100);
+                             FilteredHuman.saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
 
 
-                      } else {
-                          Dataset df3 = sqlContext.sql(unMapped);
-                          JavaPairRDD<Text, SequencedFragment> unAligned = dfToFastq(df3);
-                          unAligned.saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+                         } else {
+                             Dataset df3 = sqlContext.sql(unMapped);
+                             JavaPairRDD<Text, SequencedFragment> unAligned = dfToFastq(df3);
+                             unAligned.saveAsNewAPIHadoopFile(output + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
 
 
-                      }
+                         }
+                     } catch (Exception e) {
+                         System.out.println("Skipping this bam: " + bm);
+                     }
 
               }
           }

@@ -16,7 +16,7 @@ import static org.ngseq.metagenomics.QualityCheckFastq.GetPathArray;
 
 public class ConcatParts {
     public static void main(String[] args) throws IOException {
-        SparkConf conf = new SparkConf().setAppName("SortUnalignedTCGA");
+        SparkConf conf = new SparkConf().setAppName("ConcatParts");
 
         JavaSparkContext sc = new JavaSparkContext(conf);
 

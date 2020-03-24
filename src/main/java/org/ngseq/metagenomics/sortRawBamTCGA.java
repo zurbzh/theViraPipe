@@ -69,7 +69,7 @@ public class sortRawBamTCGA {
             FileSystem fs = FileSystem.get(new Configuration());
 
 
-
+            /*
             Path patinentFile = new Path(patients);
             FSDataInputStream inputStream = fs.open(patinentFile);
             //Classical input stream usage
@@ -87,7 +87,7 @@ public class sortRawBamTCGA {
             //fs.close();
 
 
-
+            */
 
             FileStatus[] files = fs.listStatus(new Path(inputPath));
 
@@ -95,56 +95,79 @@ public class sortRawBamTCGA {
                 String fl = file.getPath().toUri().getRawPath();
                 List<String> items = Arrays.asList(fl.split("\\s*/\\s*"));
                 String name = items.get(items.size() - 1).split("\\.")[0];
-                if (lines.contains(name))
-                {
+                // if (lines.contains(name))
+                //{
 
-                    FileStatus[] patient = fs.listStatus(file.getPath());
+                FileStatus[] patient = fs.listStatus(file.getPath());
 
-                    for (FileStatus f : Arrays.asList(patient)) {
-                        System.out.println("target patoient " + f.toString());
-                        if (f.getPath().getName().endsWith(".bam")) {
-                            String rawBam = f.getPath().toUri().getRawPath();
-                            JavaPairRDD<LongWritable, SAMRecordWritable> bamPairRDD = sc.newAPIHadoopFile(rawBam, AnySAMInputFormat.class, LongWritable.class, SAMRecordWritable.class, sc.hadoopConfiguration());
-                            //Map to SAMRecord RDD
-                            JavaRDD<SAMRecord> samRDD = bamPairRDD.map(v1 -> v1._2().get());
-                            JavaRDD<MyAlignment> rdd = samRDD.map(bam -> new MyAlignment(bam.getReadName(), bam.getStart(), bam.getReferenceName(), bam.getReadLength(), new String(bam.getReadBases(), StandardCharsets.UTF_8), bam.getCigarString(), bam.getReadUnmappedFlag(), bam.getDuplicateReadFlag(), bam.getBaseQualityString(), bam.getReadPairedFlag(), bam.getFirstOfPairFlag(), bam.getSecondOfPairFlag()));
+                for (FileStatus f : Arrays.asList(patient)) {
+                    System.out.println("target patoient " + f.toString());
+                    if (f.getPath().getName().endsWith(".bam")) {
+                        String rawBam = f.getPath().toUri().getRawPath();
+                        JavaPairRDD<LongWritable, SAMRecordWritable> bamPairRDD = sc.newAPIHadoopFile(rawBam, AnySAMInputFormat.class, LongWritable.class, SAMRecordWritable.class, sc.hadoopConfiguration());
+                        //Map to SAMRecord RDD
+                        JavaRDD<SAMRecord> samRDD = bamPairRDD.map(v1 -> v1._2().get());
+                        JavaRDD<MyAlignment> rdd = samRDD.map(bam -> new MyAlignment(bam.getReadName(), bam.getStart(), bam.getReferenceName(), bam.getReadLength(), new String(bam.getReadBases(), StandardCharsets.UTF_8), bam.getCigarString(), bam.getReadUnmappedFlag(), bam.getDuplicateReadFlag(), bam.getBaseQualityString(), bam.getReadPairedFlag(), bam.getFirstOfPairFlag(), bam.getSecondOfPairFlag()));
 
-                            Dataset<Row> samDF = sqlContext.createDataFrame(rdd, MyAlignment.class);
-                            samDF.registerTempTable("records");
+                        Dataset<Row> samDF = sqlContext.createDataFrame(rdd, MyAlignment.class);
+                        samDF.registerTempTable("records");
 
 
-                            Dataset pairEndKeys = samDF.groupBy("readName").agg(count("*").as("count")).where("count == 2");
+                        Dataset pairEndKeys = samDF.groupBy("readName").agg(count("*").as("count")).where("count == 2");
 
-                            Dataset<Row> pairDF = pairEndKeys.join(samDF, pairEndKeys.col("readName").equalTo(samDF.col("readName"))).drop(pairEndKeys.col("readName"));
+                        Dataset<Row> pairDF = pairEndKeys.join(samDF, pairEndKeys.col("readName").equalTo(samDF.col("readName"))).drop(pairEndKeys.col("readName"));
 
-                            Dataset<Row> sortedPairDF = pairDF.sort("readName","secondOfPairFlag");
 
-                            dfToFastqRDD(sortedPairDF).coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+                        pairDF.registerTempTable("paired");
+                        String forward = "SELECT * from paired WHERE firstOfPairFlag = TRUE";
+                        String reverse = "SELECT * from paired WHERE firstOfPairFlag = FALSE";
+                        Dataset<Row> forwardDF = sqlContext.sql(forward).sort("readName");
+                        Dataset<Row> reverseDF = sqlContext.sql(reverse).sort("readName");
 
-                        }
+                        JavaPairRDD<Text, SequencedFragment> forwardRDD = dfToFastqRDD(forwardDF);
+                        JavaPairRDD<Text, SequencedFragment> reverseRDD = dfToFastqRDD(reverseDF);
+                        forwardRDD.coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name + "/" + "forward", Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+                        reverseRDD.coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name + "/" + "reverse", Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+
+
+                        // Dataset<Row> sortedPairDF = pairDF.sort("readName","secondOfPairFlag");
+
+                        //dfToFastqRDD(sortedPairDF).coalesce(1).saveAsNewAPIHadoopFile(outDir + "/" + name, Text.class, SequencedFragment.class, FastqOutputFormat.class, sc.hadoopConfiguration());
+
                     }
-
                 }
+
+                //}
             }
+
+
+
 
             FileStatus[] dr = fs.listStatus(new Path(outDir));
             for (FileStatus dir : dr) {
                 System.out.println("directory " + dir.toString());
-                FileStatus[] folders = fs.listStatus(dir.getPath());
-                for (int i = 0; i < folders.length; i++) {
-                    String fn = folders[i].getPath().getName();
+                FileStatus[] caseNames = fs.listStatus(dir.getPath());
+                for (FileStatus fw_rf: caseNames){
 
-                    if (!fn.equalsIgnoreCase("_SUCCESS")) {
-                        String folder = dir.getPath().toUri().getRawPath();
-                        String fileName = folder.substring(folder.lastIndexOf("/") + 1) + ".fq";
 
-                        Path srcPath = new Path(folders[i].getPath().toUri().getRawPath());
-                        String newPath = dir.getPath().getParent().toUri().getRawPath() + "/" + fileName;
-                        Path dstPath = new Path(newPath);
+                        FileStatus[] split = fs.listStatus(fw_rf.getPath());
 
-                        FileUtil.copy(fs, srcPath, fs, dstPath, true, new Configuration());
-                        fs.delete(new Path(dir.getPath().toUri().getRawPath()));
-                    }
+                        for (int i = 0; i < split.length; i++) {
+                            String fn = split[i].getPath().getName();
+
+                            if (!fn.equalsIgnoreCase("_SUCCESS")) {
+                                String folder = fw_rf.getPath().toUri().getRawPath();
+                                String fileName = folder.substring(folder.lastIndexOf("/") + 1) + ".fq";
+
+                                Path srcPath = new Path(split[i].getPath().toUri().getRawPath());
+                                String newPath = fw_rf.getPath().getParent().toUri().getRawPath() + "/" + fileName;
+                                Path dstPath = new Path(newPath);
+
+                                FileUtil.copy(fs, srcPath, fs, dstPath, true, new Configuration());
+                                fs.delete(new Path(fw_rf.getPath().toUri().getRawPath()));
+                            }
+                        }
+
 
                 }
             }

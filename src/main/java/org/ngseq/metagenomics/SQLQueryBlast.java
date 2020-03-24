@@ -72,8 +72,8 @@ public class SQLQueryBlast {
 
 
         JavaRDD<String> blastrdd = sc.textFile(input);
-        JavaRDD<String> taxardd = sc.textFile("hdfs:///Projects/TCGA/Libraries/acc_taxid_gi_species.txt");
-        JavaRDD<String> virrdd = sc.textFile("hdfs:///Projects/TCGA/Libraries/VIR_final_taxa.txt");
+        JavaRDD<String> taxardd = sc.textFile("hdfs:///Projects/novaseq/Resources/acc_taxid_gi_species.txt");
+        JavaRDD<String> virrdd = sc.textFile("hdfs:///Projects/novaseq/Resources/VIR_final_taxa.txt");
 
         JavaRDD<BlastRecord> blastRDD = blastrdd.map(f -> {
 
@@ -154,16 +154,13 @@ public class SQLQueryBlast {
 
         Dataset<Row> finalResultDF = resultDF.filter(resultDF.col("order").equalTo(1));
 
-        finalResultDF.show();
-
         Dataset<Row> viruses = finalResultDF.filter(finalResultDF.col("organism").equalTo("Viruses"));
-        viruses.show();
 
 
         Dataset viralSpecies = viruses.join(virDF, viruses.col("acc").equalTo(virDF.col("acc")));
         viralSpecies.registerTempTable("viruses");
 
-        dfToTabAll(finalResultDF).saveAsTextFile(outDir);
+        dfToTabAll(viralSpecies).coalesce(1).saveAsTextFile(outDir);
         /*
         if(outDir!=null){
             JavaRDD<String> resultRDD = dfToTabDelimited(viralSpecies).coalesce(1);
@@ -192,7 +189,7 @@ public class SQLQueryBlast {
 
             String output = row.getAs("qseqid")+"|"+row.getAs("acc")+"|"+row.getAs("pident")+"|"
                     +row.getAs("coverage")+"|"+ row.getAs("qlen")+"|"+row.getAs("evalue")+"|"
-                    +row.getAs("organism");
+                    +row.getAs("taxa");
 
             return output;
         });
